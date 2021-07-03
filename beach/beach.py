@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from functools import cached_property
 import numpy as np
 from PIL import Image
+from stqdm import stqdm
 from .point import FreePoint, TakenPoint
 
 
@@ -13,13 +14,13 @@ class Beach:
 
     @property
     def next(self):
-        point, distance = max(
-            (
-                (free, min(self.taken, lambda taken: free.distance(taken)))
-                for free in self.free
-            ),
-            key=lambda pair: pair[1],
-        )
+        point = None
+        distance = None
+        for candidate in stqdm(self.free, desc="Deciding next step"):
+            candidate_distance = min(candidate.distance(taken) for taken in self.taken)
+            if point is None or candidate_distance > distance:
+                point = candidate
+                distance = candidate_distance
         return type(self)(
             free=self.free - {point},
             taken=Set.union(
@@ -43,20 +44,33 @@ class Beach:
         )
 
     def render(self, attribute):
-        getter = lambda point: getattr(point, attribute)
-        attributes = map(getter, self.taken)
-        min_attr = min(attributes)
-        max_attr = max(attributes)
-        brightness = lambda point: (getter(point) - min_attr) / (max_attr - min_attr)
+        if len(self.taken) == 0:
+            brightness = lambda point: 0
+        else:
+            getter = lambda point: getattr(point, attribute)
+            attributes = lambda: map(getter, self.taken)
+            min_attr = min(attributes())
+            max_attr = max(attributes())
+            if min_attr == max_attr:
+                brightness = lambda point: 0
+            else:
+                brightness = lambda point: (getter(point) - min_attr) / (
+                    max_attr - min_attr
+                )
         array = np.zeros(
-            self.span[1][1] - self.span[1][0] + 1, self.span[0][1] - self.span[0][0] + 1
+            (
+                self.span[1][1] - self.span[1][0] + 1,
+                self.span[0][1] - self.span[0][0] + 1,
+            )
         )
         for taken in self.taken:
             array[taken.y - self.span[1][0], taken.x - self.span[0][0]] = brightness(
                 taken
             )
-        return Image.fromarray(array)
+        return Image.fromarray(np.round(array * 255).astype(np.uint8))
 
     def extreme(self, side, attribute):
-        point = side(self.free | self.taken, key=lambda point: getattr(attribute))
+        point = side(
+            self.free | self.taken, key=lambda point: getattr(point, attribute)
+        )
         return getattr(point, attribute)

@@ -11,11 +11,11 @@ class Point:
 
 
 @dataclass(frozen=True)
-class FreePoint:
+class FreePoint(Point):
     pass
 
 
 @dataclass(frozen=True)
-class TakenPoint:
+class TakenPoint(Point):
     taken_step: int
     distance: float
