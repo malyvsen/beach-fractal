@@ -7,7 +7,7 @@ class Point:
     y: int
 
     def distance(self, other):
-        return (self.x - other.x) ** 2 + (self.y - other.y) ** 2
+        return ((self.x - other.x) ** 2 + (self.y - other.y) ** 2) ** 0.5
 
 
 @dataclass(frozen=True)
