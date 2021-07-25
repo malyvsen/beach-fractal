@@ -1,76 +1,56 @@
-from typing import Set
-from dataclasses import dataclass
-from functools import cached_property
+from typing import Dict, Tuple
+from dataclasses import dataclass, replace
+import math
 import numpy as np
 from PIL import Image
-from stqdm import stqdm
-from .point import FreePoint, TakenPoint
+from .grain import Grain, FreeGrain, TakenGrain
 
 
 @dataclass(frozen=True)
 class Beach:
-    free: Set[FreePoint]
-    taken: Set[TakenPoint]
+    grains: Dict[Tuple[int, int], Grain]
+
+    @property
+    def free(self):
+        return [grain for grain in self.grains.values() if isinstance(grain, FreeGrain)]
 
     @property
     def next(self):
-        point = None
-        distance = None
-        for candidate in stqdm(self.free, desc="Deciding next step"):
-            candidate_distance = min(candidate.distance(taken) for taken in self.taken)
-            if point is None or candidate_distance > distance:
-                point = candidate
-                distance = candidate_distance
-        return type(self)(
-            free=self.free - {point},
-            taken=Set.union(
-                self.taken,
-                {
-                    TakenPoint(
-                        x=point.x,
-                        y=point.y,
-                        taken_step=len(self.taken),
-                        distance=distance,
-                    )
-                },
-            ),
-        )
-
-    @cached_property
-    def span(self):
-        return (
-            (self.extreme(min, "x"), self.extreme(max, "x")),
-            (self.extreme(min, "y"), self.extreme(max, "y")),
-        )
-
-    def render(self, attribute):
-        if len(self.taken) == 0:
-            brightness = lambda point: 0
-        else:
-            getter = lambda point: getattr(point, attribute)
-            attributes = lambda: map(getter, self.taken)
-            min_attr = min(attributes())
-            max_attr = max(attributes())
-            if min_attr == max_attr:
-                brightness = lambda point: 0
-            else:
-                brightness = lambda point: (getter(point) - min_attr) / (
-                    max_attr - min_attr
-                )
-        array = np.zeros(
+        coords = max(
             (
-                self.span[1][1] - self.span[1][0] + 1,
-                self.span[0][1] - self.span[0][0] + 1,
-            )
+                coords
+                for coords in self.grains.keys()
+                if isinstance(self.grains[coords], FreeGrain)
+            ),
+            key=lambda coords: self.grains[coords].free_radius,
         )
-        for taken in self.taken:
-            array[taken.y - self.span[1][0], taken.x - self.span[0][0]] = brightness(
-                taken
-            )
-        return Image.fromarray(np.round(array * 255).astype(np.uint8))
+        grain = self.grains[coords]
+        result = self.grains.copy()
+        result[coords] = TakenGrain(taken_radius=grain.free_radius)
+        make_range = lambda coord_id: range(
+            math.floor(coords[coord_id] - grain.free_radius + 1),
+            math.ceil(coords[coord_id] + grain.free_radius),
+        )
+        for x in make_range(0):
+            for y in make_range(1):
+                if isinstance(result[(x, y)], TakenGrain):
+                    continue
+                distance = Grain.distance(coords, (x, y))
+                result[(x, y)] = replace(
+                    result[(x, y)],
+                    free_radius=min(result[(x, y)].free_radius, distance),
+                )
+        return type(self)(grains=result)
 
-    def extreme(self, side, attribute):
-        point = side(
-            self.free | self.taken, key=lambda point: getattr(point, attribute)
+    def render(self):
+        span = (
+            lambda coord_id: max(coords[coord_id] for coords in self.grains.keys()) + 1
         )
-        return getattr(point, attribute)
+        array = np.zeros((span(0), span(1)))
+        for coords, grain in self.grains.items():
+            if isinstance(grain, FreeGrain):
+                continue
+            array[coords[0], coords[1]] = grain.taken_radius
+        if array.max() > 0:
+            array /= array.max()
+        return Image.fromarray(np.round(array * 255).astype(np.uint8).T)

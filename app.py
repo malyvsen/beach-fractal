@@ -1,5 +1,6 @@
 import streamlit as st
 from PIL import Image
+from stqdm import stqdm
 from beach import Beach
 
 
@@ -11,10 +12,10 @@ def render():
     if mask is None:
         return
     beach = Beach.from_image(Image.open(mask))
-    render = st.image(beach.render("distance"))
-    while len(beach.free) > 0:
+    render = st.image(beach.render())
+    for _ in stqdm(range(len(beach.free)), desc="Populating beach"):
         beach = beach.next
-        render.image(beach.render("distance"))
+        render.image(beach.render())
 
 
 render()
