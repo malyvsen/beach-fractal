@@ -6,16 +6,53 @@ from beach import Beach
 
 def render():
     st.title("Beach fractal")
-    mask = st.file_uploader(
-        "Mask image (white for beach, black for rest)", type=["png"]
+    with st.beta_expander("What's this all about?", expanded=True):
+        st.markdown(
+            "It's 6am. You're first at the beach. "
+            "The strategic question arises: where should you put your towel? "
+            "After brief consideration, you lie down in the very middle - it's *your* beach, after all."
+        )
+        st.markdown(
+            "It's 6:15am. That annoying local beach amateur swoops by. "
+            "She lies down in the middle of the remaining space "
+            "- as far away from you and the edges of the beach as possible."
+        )
+        st.markdown(
+            "By 8am, the beach is full of families with children. "
+            "To distract yourself from the constant screaming, you start thinking about mathematics."
+        )
+        st.markdown(
+            "Everyone who came took the place that was farthest from other beachmongers and the edge. "
+            "Could this be... **a fractal pattern**? Let's find out!"
+        )
+
+    shape_selection = st.selectbox(
+        "Which beach shape to use?", options=["Example shape", "Custom shape"]
     )
-    if mask is None:
+    if shape_selection == "Example shape":
+        mask_file = "./sample.png"
+        if not st.button("Let's go!"):
+            return
+    else:
+        mask_file = st.file_uploader(
+            "Beach shape image (white for beach, black for non-beach)", type=["png"]
+        )
+    if mask_file is None:
         return
-    beach = Beach.from_image(Image.open(mask))
-    render = st.image(beach.render())
+
+    beach = Beach.from_image(Image.open(mask_file))
+    render = None
     for _ in stqdm(range(len(beach.free)), desc="Populating beach"):
         beach = beach.next
-        render.image(beach.render())
+        if render is None:
+            render = st.empty()
+        render.image(beach.render(), use_column_width=True)
+
+    with st.beta_expander("What do the colors mean?"):
+        st.markdown(
+            "The brightness of a point on the beach corresponds to the distance from that point to "
+            "the nearest edge/other beachmonger when that point was taken."
+        )
 
 
 render()
