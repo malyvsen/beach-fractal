@@ -41,18 +41,25 @@ def render():
         return
 
     beach = Beach.from_image(Image.open(mask_file))
-    render = None
-    for _ in stqdm(range(len(beach.free)), desc="Populating beach"):
-        beach = beach.next
-        if render is None:
-            render = st.empty()
-        render.image(beach.render(), use_column_width=True)
-
+    progress_container = st.beta_container()
+    render = st.empty()
     with st.beta_expander("What do the colors mean?"):
         st.markdown(
             "The brightness of a point on the beach corresponds to the distance from that point to "
             "the nearest edge/other beachmonger when that point was taken."
         )
+    with st.beta_expander("Where can I read more?"):
+        st.markdown(
+            "I don't know if someone thought of this particular fractal yet, "
+            "but you can read about fractals in general on [Wikipedia](https://en.wikipedia.org/wiki/Fractal) - "
+            "they have pretty pictures!"
+        )
+
+    for _ in stqdm(
+        range(len(beach.free)), desc="Populating beach", st_container=progress_container
+    ):
+        beach = beach.next
+        render.image(beach.render(), use_column_width=True)
 
 
 render()
