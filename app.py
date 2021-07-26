@@ -37,12 +37,24 @@ def render():
         mask_file = st.file_uploader(
             "Beach shape image (white for beach, black for non-beach)", type=["png"]
         )
-    if mask_file is None:
-        return
+        if mask_file is None:
+            return
 
-    beach = Beach.from_image(Image.open(mask_file))
+    mask = Image.open(mask_file)
+    original_area = mask.width * mask.height
+    max_area = 256 * 128
+    if original_area > max_area:
+        st.info("Your picture is pretty big, I'll need to resize it.")
+        scaling = (max_area / original_area) ** 0.5
+        mask = mask.resize(size=(int(mask.width * scaling), int(mask.height * scaling)))
+
+    beach = Beach.from_image(mask)
     progress_container = st.beta_container()
     render = st.empty()
+    with st.beta_expander("So where's the fractal?"):
+        st.markdown(
+            "It sometimes doesn't load :( Try going to another tab and returning to this one again."
+        )
     with st.beta_expander("What do the colors mean?"):
         st.markdown(
             "The brightness of a point on the beach corresponds to the distance from that point to "
